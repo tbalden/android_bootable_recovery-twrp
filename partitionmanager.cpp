@@ -880,9 +880,13 @@ int TWPartitionManager::Run_Restore(string Restore_Name) {
 			restore_path = Restore_List.substr(start_pos, end_pos - start_pos);
 			restore_part = Find_Partition_By_Path(restore_path);
 			if (restore_part != NULL) {
-				partition_count++;
+				if (restore_part->Mount_Read_Only) {
+					LOGERR("Cannot restore %s -- mounted read only.\n", restore_part->Backup_Display_Name.c_str());
+					return false;
+				}
 				if (check_md5 > 0 && !restore_part->Check_MD5(Restore_Name))
 					return false;
+				partition_count++;
 				total_restore_size += restore_part->Get_Restore_Size(Restore_Name);
 				if (restore_part->Has_SubPartition) {
 					std::vector<TWPartition*>::iterator subpart;
@@ -1245,6 +1249,34 @@ int TWPartitionManager::Repair_By_Path(string Path, bool Display_Error) {
 		LOGERR("Repair: Unable to find partition for path '%s'\n", Local_Path.c_str());
 	} else {
 		LOGINFO("Repair: Unable to find partition for path '%s'\n", Local_Path.c_str());
+	}
+	return false;
+}
+
+int TWPartitionManager::Resize_By_Path(string Path, bool Display_Error) {
+	std::vector<TWPartition*>::iterator iter;
+	int ret = false;
+	bool found = false;
+	string Local_Path = TWFunc::Get_Root_Path(Path);
+
+	if (Local_Path == "/tmp" || Local_Path == "/")
+		return true;
+
+	// Iterate through all partitions
+	for (iter = Partitions.begin(); iter != Partitions.end(); iter++) {
+		if ((*iter)->Mount_Point == Local_Path || (!(*iter)->Symlink_Mount_Point.empty() && (*iter)->Symlink_Mount_Point == Local_Path)) {
+			ret = (*iter)->Resize();
+			found = true;
+		} else if ((*iter)->Is_SubPartition && (*iter)->SubPartition_Of == Local_Path) {
+			(*iter)->Resize();
+		}
+	}
+	if (found) {
+		return ret;
+	} else if (Display_Error) {
+		LOGERR("Resize: Unable to find partition for path '%s'\n", Local_Path.c_str());
+	} else {
+		LOGINFO("Resize: Unable to find partition for path '%s'\n", Local_Path.c_str());
 	}
 	return false;
 }

@@ -97,7 +97,6 @@ static bool isMDP5 = false;
 
 bool target_has_overlay(char *version)
 {
-    int ret;
     int mdp_version;
 
     if (strlen(version) >= 8) {
